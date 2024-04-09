@@ -1,0 +1,143 @@
+' Main subroutine to analyze stock data across all worksheets
+Sub AnalyzeStockData()
+    ' Variable declarations
+    Dim sheet As Worksheet
+    Dim nextRow As Long
+    Dim totalRows As Long
+    Dim currentRow As Long
+    Dim changeThisYear As Double
+    
+    ' More variable declarations for stock data analysis
+    Dim currentTicker As String
+    Dim closingPrice As Double
+    Dim openingPrice As Double
+    Dim totalVolume As Double
+    
+    ' Variable for calculating percentage change
+    Dim percentageChange As Double
+    
+    ' Loop through each worksheet in the workbook
+    For Each sheet In Worksheets
+        ' Setting up headers for the summary table on each worksheet
+        With sheet
+            .Range("I1").Value = "Ticker Symbol"
+            .Range("J1").Value = "Annual Change"
+            .Range("K1").Value = "Percentage Change"
+            .Range("L1").Value = "Sum Volume"
+        End With
+        
+        ' Initialize variables for the new worksheet
+        nextRow = 2
+        totalRows = sheet.Cells(sheet.Rows.Count, 1).End(xlUp).Row
+        totalVolume = 0
+        
+        ' Loop through all rows in the current worksheet
+        For currentRow = 2 To totalRows
+            currentTicker = sheet.Cells(currentRow, 1).Value
+            
+            ' Check if we've reached a new ticker (or the end of the current one)
+            If currentTicker <> sheet.Cells(currentRow + 1, 1).Value Then
+                ' Sum up the volume for the last row of the current ticker
+                totalVolume = totalVolume + sheet.Cells(currentRow, 7).Value
+                ' Record the closing price for the current ticker
+                closingPrice = sheet.Cells(currentRow, 6).Value
+                ' Calculate the annual change for the ticker
+                changeThisYear = closingPrice - openingPrice
+                ' Calculate the percentage change, handling division by zero
+                If openingPrice <> 0 Then
+                    percentageChange = changeThisYear / openingPrice
+                Else
+                    percentageChange = 0
+                End If
+                
+                ' Update the summary table with the current ticker's data
+                With sheet
+                    .Cells(nextRow, 9).Value = currentTicker
+                    .Cells(nextRow, 10).Value = changeThisYear
+                    .Cells(nextRow, 10).NumberFormat = "$#,##0.00"
+                    .Cells(nextRow, 11).Value = percentageChange
+                    .Cells(nextRow, 11).NumberFormat = "0.00%"
+                    .Cells(nextRow, 12).Value = totalVolume
+                End With
+                
+                ' Apply conditional formatting based on annual and percentage changes
+                Call FormatCell(sheet.Cells(nextRow, 10), changeThisYear)
+                Call FormatCell(sheet.Cells(nextRow, 11), percentageChange)
+                
+                ' Prepare for the next ticker
+                nextRow = nextRow + 1
+                totalVolume = 0
+            Else
+                ' Accumulate volume for the current ticker
+                totalVolume = totalVolume + sheet.Cells(currentRow, 7).Value
+                ' If this is the first row of the current ticker, record the opening price
+                If currentTicker <> sheet.Cells(currentRow - 1, 1).Value Then
+                    openingPrice = sheet.Cells(currentRow, 3).Value
+                End If
+            End If
+        Next currentRow
+        
+        ' Find and highlight the maximum increases, decreases, and volume
+        Call FindHighlights(sheet)
+    Next sheet
+End Sub
+
+' Subroutine to apply conditional formatting based on value changes
+Sub FormatCell(cell As Range, valueChange As Double)
+    With cell.Interior
+        ' Green fill for positive changes, red for negative, no fill for no change
+        If valueChange > 0 Then
+            .ColorIndex = 4 ' Green
+        ElseIf valueChange < 0 Then
+            .ColorIndex = 3 ' Red
+        Else
+            .ColorIndex = 0 ' No fill
+        End If
+    End With
+End Sub
+
+' Subroutine to find the maximum increase, decrease, and total volume in the summary table
+Sub FindHighlights(ws As Worksheet)
+    Dim lastRow As Long
+    Dim maxIncrease As Double, maxDecrease As Double, maxVolume As Double
+    Dim rowMaxIncrease As Long, rowMaxDecrease As Long, rowMaxVolume As Long
+    
+    ' Determine the last row of the summary table
+    lastRow = ws.Cells(ws.Rows.Count, "I").End(xlUp).Row
+    
+    ' Setting up headers for the "greatest" table on the worksheet
+    With ws
+        .Range("O1").Value = "Metric"
+        .Range("P1").Value = "Ticker Symbol"
+        .Range("Q1").Value = "Metric Value"
+        
+        ' Initialize the maximum values for each category
+        .Range("O2").Value = "Max Percentage Increase"
+        .Range("O3").Value = "Max Percentage Decrease"
+        .Range("O4").Value = "Max Volume"
+        
+        ' Find the maximum values within the summary table
+        maxIncrease = Application.WorksheetFunction.Max(.Range("K2:K" & lastRow))
+        maxDecrease = Application.WorksheetFunction.Min(.Range("K2:K" & lastRow))
+        maxVolume = Application.WorksheetFunction.Max(.Range("L2:L" & lastRow))
+        
+        ' Loop through the summary table to find the rows with the maximum values
+        For i = 2 To lastRow
+            If .Cells(i, 11).Value = maxIncrease Then rowMaxIncrease = i
+            If .Cells(i, 11).Value = maxDecrease Then rowMaxDecrease = i
+            If .Cells(i, 12).Value = maxVolume Then rowMaxVolume = i
+        Next i
+        
+        ' Update the "greatest" table with the found maximum values
+        .Range("P2").Value = .Cells(rowMaxIncrease, 9).Value
+        .Range("Q2").Value = maxIncrease
+        .Range("Q2").NumberFormat = "0.00%"
+        
+        .Range("P3").Value = .Cells(rowMaxDecrease, 9).Value
+        .Range("Q3").Value = maxDecrease
+        .Range("Q3").NumberFormat = "0.00%"
+        
+        .Range("P4").Value = .Cells(rowMaxVolume, 9).Value
+        .Range("Q4").Value = maxVolume
+    End With
+End Sub
