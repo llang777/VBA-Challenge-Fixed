@@ -1,4 +1,4 @@
-VBA Challenge Fixed!
+Stock Analysis via VBA Scripting on Excel Spreadsheets
 
 VBA code analyzes stock data on multiple sheets, using a script that loops through all the stocks for one year and outputs the following information:
 
